@@ -2,6 +2,7 @@ package main
 
 import (
 	"my-godis/src/lib/logger"
+	"my-godis/src/redis/handler"
 	"my-godis/src/server"
 	"time"
 )
@@ -18,5 +19,5 @@ func main() {
 		Address:    "127.0.0.1:6379",
 		MaxConnect: 16,
 		Timeout:    2 * time.Second,
-	}, server.MakeEchoHandler())
+	}, handler.MakeHandler())
 }
