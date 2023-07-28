@@ -8,6 +8,7 @@ import (
 	"my-godis/src/redis/reply"
 	"runtime/debug"
 	"strings"
+	"sync"
 )
 
 const (
@@ -22,6 +23,7 @@ type DataEntity struct {
 	Code uint8
 	TTL  int64 // ttl in seconds, 0 for unlimited ttl
 	Data interface{}
+	sync.RWMutex
 }
 
 // args don't include cmd line

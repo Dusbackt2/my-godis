@@ -14,16 +14,16 @@ type Dict struct {
 	rehashIndex int32
 }
 
+type Shard struct {
+	head  *Node
+	mutex sync.RWMutex
+}
+
 type Node struct {
 	key      string
 	val      interface{}
 	next     *Node
 	hashCode uint32
-}
-
-type Shard struct {
-	head  *Node
-	mutex sync.RWMutex
 }
 
 const (
