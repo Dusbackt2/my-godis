@@ -490,3 +490,72 @@ func (dict *Dict) transfer(wg *sync.WaitGroup) {
 		shard.mutex.RUnlock()
 	}
 }
+
+type Consumer func(key string, val interface{}) bool
+
+func (shard *Shard) ForEach(consumer Consumer) bool {
+	if shard == nil {
+		panic("shard is nil")
+	}
+	shard.mutex.RLock()
+	defer shard.mutex.RUnlock()
+
+	node := shard.head
+	for node != nil {
+		toContinue := consumer(node.key, node.val)
+		if !toContinue {
+			return false
+		}
+		node = node.next
+	}
+	return true
+}
+
+/*
+ * may not contains new entry inserted during traversal
+ */
+func (dict *Dict) ForEach(consumer Consumer) {
+	if dict == nil {
+		panic("dict is nil")
+	}
+	table, ok := dict.table.Load().([]*Shard)
+	if !ok {
+		panic("load table failed")
+	}
+
+	var rehashIndex int32
+	tableSize := len(table)
+	for index, shard := range table {
+		rehashIndex = atomic.LoadInt32(&dict.rehashIndex)
+		if rehashIndex >= int32(index) {
+			// current slot has rehashed
+			if dict.nextTable == nil {
+				// rehash has finished, traver current table
+				// local variable `table` will not change to nextTable
+				if !shard.ForEach(consumer) {
+					break
+				}
+			}
+
+			i0 := index
+			nextShard0 := dict.nextTable[i0]
+			if nextShard0 != nil {
+				if !nextShard0.ForEach(consumer) {
+					break
+				}
+			}
+
+			i1 := index + tableSize
+			nextShard1 := dict.nextTable[i1]
+			if nextShard1 != nil {
+				if !nextShard1.ForEach(consumer) {
+					break
+				}
+			}
+		} else {
+			if !shard.ForEach(consumer) {
+				break
+			}
+		}
+	}
+}
