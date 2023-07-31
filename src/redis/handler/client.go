@@ -8,6 +8,7 @@ import (
 	"my-godis/src/lib/sync/atomic"
 )
 
+// abstract of active server
 type Client struct {
 	conn net.Conn
 
@@ -17,16 +18,16 @@ type Client struct {
 	// is sending request in progress
 	sending atomic.AtomicBool
 	// multi bulk msg lineCount - 1(first line)
-	expectedLineCount uint32
+	expectedArgsCount uint32
 	// sent line count, exclude first line
-	sentLineCount uint32
+	receivedCount uint32
 	// sent lines, exclude first line
-	sentLines [][]byte
+	args [][]byte
 }
 
 func (c *Client) Close() error {
 	c.waitingReply.WaitWithTimeout(10 * time.Second)
-	c.conn.Close()
+	_ = c.conn.Close()
 	return nil
 }
 
