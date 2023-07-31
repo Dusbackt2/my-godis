@@ -109,17 +109,3 @@ func (r *StandardErrReply) ToBytes() []byte {
 func (r *StandardErrReply) Error() string {
 	return r.Status
 }
-
-// ProtocolErr
-
-type ProtocolErrReply struct {
-	Msg string
-}
-
-func (r *ProtocolErrReply) ToBytes() []byte {
-	return []byte("-ERR Protocol error: '" + r.Msg + "\r\n")
-}
-
-func (r *ProtocolErrReply) Error() string {
-	return "ERR Protocol error: '" + r.Msg
-}
