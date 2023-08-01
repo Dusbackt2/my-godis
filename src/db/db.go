@@ -8,6 +8,7 @@ import (
 	"my-godis/src/interface/redis"
 	"my-godis/src/lib/logger"
 	"my-godis/src/redis/reply"
+	"os"
 	"runtime/debug"
 	"strings"
 	"sync"
@@ -22,10 +23,18 @@ const (
 	dataDictSize = 2 << 20
 	ttlDictSize  = 2 << 10
 	lockerSize   = 128
+	aofQueueSize = 2 << 10
+	aofFilename  = "aof.aof"
 )
 
+type extra struct {
+	// need write into aof file
+	toPersist  bool
+	specialAof []*reply.MultiBulkReply
+}
+
 // args don't include cmd line
-type CmdFunc func(db *DB, args [][]byte) redis.Reply
+type CmdFunc func(db *DB, args [][]byte) (redis.Reply, *extra)
 
 type DB struct {
 	// key -> DataEntity
@@ -48,6 +57,14 @@ type DB struct {
 	subsLocker *lock.Locks
 
 	stopWorld sync.RWMutex
+
+	// main goroutine send commands to aof goroutine through aofChan
+	aofChan     chan *reply.MultiBulkReply
+	aofFile     *os.File
+	aofFilename string
+
+	aofRewriteChan chan *reply.MultiBulkReply
+	pausingAof     sync.RWMutex
 }
 
 var router = MakeRouter()
@@ -62,8 +79,31 @@ func MakeDB() *DB {
 		subs:       dict.Make(4),
 		subsLocker: lock.Make(16),
 	}
+
+	db.aofFilename = aofFilename
+	db.loadAof()
+	aofFile, err := os.OpenFile(db.aofFilename, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0600)
+	if err != nil {
+		logger.Warn(err)
+	} else {
+		db.aofFile = aofFile
+		db.aofChan = make(chan *reply.MultiBulkReply, aofQueueSize)
+	}
+	go func() {
+		db.handleAof()
+	}()
+
 	db.TimerTask()
 	return db
+}
+
+func (db *DB) Close() {
+	if db.aofFile != nil {
+		err := db.aofFile.Close()
+		if err != nil {
+			logger.Warn(err)
+		}
+	}
 }
 
 func (db *DB) Exec(c redis.Client, args [][]byte) (result redis.Reply) {
@@ -76,6 +116,7 @@ func (db *DB) Exec(c redis.Client, args [][]byte) (result redis.Reply) {
 
 	cmd := strings.ToLower(string(args[0]))
 
+	// special commands
 	if cmd == "subscribe" {
 		if len(args) < 2 {
 			return &reply.ArgNumErrReply{Cmd: "subscribe"}
@@ -83,16 +124,33 @@ func (db *DB) Exec(c redis.Client, args [][]byte) (result redis.Reply) {
 		return Subscribe(db, c, args[1:])
 	} else if cmd == "unsubscribe" {
 		return UnSubscribe(db, c, args[1:])
+	} else if cmd == "bgrewriteaof" {
+		reply, _ := BGRewriteAOF(db, args[1:])
+		return reply
 	}
 
+	// normal commands
+	var extra *extra
 	cmdFunc, ok := router[cmd]
 	if !ok {
 		return reply.MakeErrReply("ERR unknown command '" + cmd + "'")
 	}
 	if len(args) > 1 {
-		result = cmdFunc(db, args[1:])
+		result, extra = cmdFunc(db, args[1:])
 	} else {
-		result = cmdFunc(db, [][]byte{})
+		result, extra = cmdFunc(db, [][]byte{})
+	}
+
+	// aof
+	if extra != nil && extra.toPersist {
+		if extra.specialAof != nil && len(extra.specialAof) > 0 {
+			for _, r := range extra.specialAof {
+				db.addAof(r)
+			}
+		} else {
+			r := reply.MakeMultiBulkReply(args)
+			db.addAof(r)
+		}
 	}
 	return
 }
