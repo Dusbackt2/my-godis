@@ -111,7 +111,7 @@ func Set(db *DB, args [][]byte) (redis.Reply, *extra) {
 		Data: value,
 	}
 
-	db.Remove(key) // clean ttl
+	db.Persist(key) // clean ttl
 	var result int
 	switch policy {
 	case upsertPolicy:

@@ -55,13 +55,13 @@ func trim(msg []byte) string {
 		if msg[i] == '\r' || msg[i] == '\n' {
 			continue
 		}
-		trimed = string(msg[:i+1])
+		return string(msg[:i+1])
 	}
 	return trimed
 }
 
 // read aof file
-func (db *DB) loadAof() {
+func (db *DB) loadAof(maxBytes int) {
 	file, err := os.Open(db.aofFilename)
 	if err != nil {
 		if _, ok := err.(*os.PathError); ok {
@@ -79,7 +79,11 @@ func (db *DB) loadAof() {
 	var args [][]byte
 	processing := false
 	var msg []byte
+	readBytes := 0
 	for {
+		if maxBytes != 0 && readBytes >= maxBytes {
+			break
+		}
 		if fixedLen == 0 {
 			msg, err = reader.ReadBytes('\n')
 			if err == io.EOF {
@@ -89,9 +93,10 @@ func (db *DB) loadAof() {
 				logger.Warn("invalid format: line should end with \\r\\n")
 				return
 			}
+			readBytes += len(msg)
 		} else {
 			msg = make([]byte, fixedLen+2)
-			_, err = io.ReadFull(reader, msg)
+			n, err := io.ReadFull(reader, msg)
 			if err == io.EOF {
 				return
 			}
@@ -100,6 +105,7 @@ func (db *DB) loadAof() {
 				return
 			}
 			fixedLen = 0
+			readBytes += n
 		}
 		if err != nil {
 			logger.Warn(err)
@@ -162,7 +168,7 @@ func (db *DB) loadAof() {
 
 /*-- aof rewrite --*/
 func (db *DB) aofRewrite() {
-	file, err := db.startRewrite()
+	file, fileSize, err := db.startRewrite()
 	if err != nil {
 		logger.Warn(err)
 		return
@@ -177,7 +183,7 @@ func (db *DB) aofRewrite() {
 
 		aofFilename: db.aofFilename,
 	}
-	tmpDB.loadAof()
+	tmpDB.loadAof(int(fileSize))
 
 	// rewrite aof file
 	tmpDB.Data.ForEach(func(key string, raw interface{}) bool {
@@ -196,6 +202,14 @@ func (db *DB) aofRewrite() {
 			cmd = persistZSet(key, val)
 
 		}
+		if cmd != nil {
+			_, _ = file.Write(cmd.ToBytes())
+		}
+		return true
+	})
+	tmpDB.TTLMap.ForEach(func(key string, raw interface{}) bool {
+		expireTime, _ := raw.(time.Time)
+		cmd := makeExpireCmd(key, expireTime)
 		if cmd != nil {
 			_, _ = file.Write(cmd.ToBytes())
 		}
@@ -278,20 +292,24 @@ func persistZSet(key string, zset *SortedSet.SortedSet) *reply.MultiBulkReply {
 	return reply.MakeMultiBulkReply(args)
 }
 
-func (db *DB) startRewrite() (*os.File, error) {
+func (db *DB) startRewrite() (*os.File, int64, error) {
 	db.pausingAof.Lock() // pausing aof
 	defer db.pausingAof.Unlock()
 
 	// create rewrite channel
 	db.aofRewriteChan = make(chan *reply.MultiBulkReply, aofQueueSize)
 
+	// get current aof file size
+	fileInfo, _ := os.Stat(db.aofFilename)
+	filesize := fileInfo.Size()
+
 	// create tmp file
 	file, err := ioutil.TempFile("", "aof")
 	if err != nil {
 		logger.Warn("tmp file create failed")
-		return nil, err
+		return nil, 0, err
 	}
-	return file, nil
+	return file, filesize, nil
 }
 
 func (db *DB) finishRewrite(tmpFile *os.File) {

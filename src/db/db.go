@@ -2,6 +2,7 @@ package db
 
 import (
 	"fmt"
+	"my-godis/src/config"
 	"my-godis/src/datastruct/dict"
 	List "my-godis/src/datastruct/list"
 	"my-godis/src/datastruct/lock"
@@ -20,8 +21,8 @@ type DataEntity struct {
 }
 
 const (
-	dataDictSize = 2 << 20
-	ttlDictSize  = 2 << 10
+	dataDictSize = 1 << 16
+	ttlDictSize  = 1 << 10
 	lockerSize   = 128
 	aofQueueSize = 2 << 10
 	aofFilename  = "aof.aof"
@@ -80,18 +81,20 @@ func MakeDB() *DB {
 		subsLocker: lock.Make(16),
 	}
 
-	db.aofFilename = aofFilename
-	db.loadAof()
-	aofFile, err := os.OpenFile(db.aofFilename, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0600)
-	if err != nil {
-		logger.Warn(err)
-	} else {
-		db.aofFile = aofFile
-		db.aofChan = make(chan *reply.MultiBulkReply, aofQueueSize)
+	if config.Properties.AppendOnly {
+		db.aofFilename = config.Properties.AppendFilename
+		db.loadAof(0)
+		aofFile, err := os.OpenFile(db.aofFilename, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0600)
+		if err != nil {
+			logger.Warn(err)
+		} else {
+			db.aofFile = aofFile
+			db.aofChan = make(chan *reply.MultiBulkReply, aofQueueSize)
+		}
+		go func() {
+			db.handleAof()
+		}()
 	}
-	go func() {
-		db.handleAof()
-	}()
 
 	db.TimerTask()
 	return db
@@ -142,14 +145,16 @@ func (db *DB) Exec(c redis.Client, args [][]byte) (result redis.Reply) {
 	}
 
 	// aof
-	if extra != nil && extra.toPersist {
-		if extra.specialAof != nil && len(extra.specialAof) > 0 {
-			for _, r := range extra.specialAof {
+	if config.Properties.AppendOnly {
+		if extra != nil && extra.toPersist {
+			if extra.specialAof != nil && len(extra.specialAof) > 0 {
+				for _, r := range extra.specialAof {
+					db.addAof(r)
+				}
+			} else {
+				r := reply.MakeMultiBulkReply(args)
 				db.addAof(r)
 			}
-		} else {
-			r := reply.MakeMultiBulkReply(args)
-			db.addAof(r)
 		}
 	}
 	return

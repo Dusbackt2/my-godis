@@ -1,6 +1,7 @@
 package dict
 
 import (
+	"math"
 	"math/rand"
 	"sync"
 	"sync/atomic"
@@ -16,10 +17,25 @@ type Shard struct {
 	mutex sync.RWMutex
 }
 
-func MakeConcurrent(shardCount int) *ConcurrentDict {
-	if shardCount < 1 {
-		shardCount = 16
+func computeCapacity(param int) (size int) {
+	if param <= 16 {
+		return 16
 	}
+	n := param - 1
+	n |= n >> 1
+	n |= n >> 2
+	n |= n >> 4
+	n |= n >> 8
+	n |= n >> 16
+	if n < 0 {
+		return math.MaxInt32
+	} else {
+		return int(n + 1)
+	}
+}
+
+func MakeConcurrent(shardCount int) *ConcurrentDict {
+	shardCount = computeCapacity(shardCount)
 	table := make([]*Shard, shardCount)
 	for i := 0; i < shardCount; i++ {
 		table[i] = &Shard{
@@ -156,7 +172,6 @@ func (dict *ConcurrentDict) Remove(key string) (result int) {
 	} else {
 		return 0
 	}
-	return
 }
 
 func (dict *ConcurrentDict) addCount() int32 {
