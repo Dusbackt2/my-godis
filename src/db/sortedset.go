@@ -29,7 +29,7 @@ func (db *DB) getOrInitSortedSet(key string) (sortedSet *SortedSet.SortedSet, in
 	inited = false
 	if sortedSet == nil {
 		sortedSet = SortedSet.Make()
-		db.Data.Put(key, &DataEntity{
+		db.Put(key, &DataEntity{
 			Data: sortedSet,
 		})
 		inited = true
