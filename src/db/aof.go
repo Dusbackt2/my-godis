@@ -2,6 +2,7 @@ package db
 
 import (
 	"bufio"
+	"my-godis/src/config"
 	"my-godis/src/datastruct/dict"
 	List "my-godis/src/datastruct/list"
 	"my-godis/src/datastruct/lock"
@@ -28,9 +29,18 @@ func makeExpireCmd(key string, expireAt time.Time) *reply.MultiBulkReply {
 	return reply.MakeMultiBulkReply(args)
 }
 
+func makeAofCmd(cmd string, args [][]byte) *reply.MultiBulkReply {
+	params := make([][]byte, len(args)+1)
+	copy(params[1:], args)
+	params[0] = []byte(cmd)
+	return reply.MakeMultiBulkReply(params)
+}
+
 // send command to aof
 func (db *DB) addAof(args *reply.MultiBulkReply) {
-	db.aofChan <- args
+	if config.Properties.AppendOnly {
+		db.aofChan <- args
+	}
 }
 
 // listen aof channel and write into file
