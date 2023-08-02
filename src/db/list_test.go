@@ -80,7 +80,7 @@ func TestPush(t *testing.T) {
 	}
 	result, _ = LPush(testDB, values)
 	if intResult, _ := result.(*reply.IntReply); intResult.Code != int64(size) {
-		t.Error(fmt.Sprintf("expected %d, actually %d", size, intResult.Code))
+		t.Errorf(fmt.Sprintf("expected %d, actually %d", size, intResult.Code))
 	}
 	actual, _ = LRange(testDB, toArgs(key, "0", "-1"))
 	expected = reply.MakeMultiBulkReply(expectedValues)
