@@ -357,12 +357,12 @@ func ZRangeByScore(db *DB, args [][]byte) redis.Reply {
 	}
 	key := string(args[0])
 
-	min, err := SortedSet.ParseScoreBorder(string(args[1]))
+	min, err := SortedSet.ParseScoreBorder(string(args[2]))
 	if err != nil {
 		return reply.MakeErrReply(err.Error())
 	}
 
-	max, err := SortedSet.ParseScoreBorder(string(args[2]))
+	max, err := SortedSet.ParseScoreBorder(string(args[1]))
 	if err != nil {
 		return reply.MakeErrReply(err.Error())
 	}

@@ -253,7 +253,7 @@ func (skiplist *skiplist) getFirstInScoreRange(min *ScoreBorder, max *ScoreBorde
 		}
 	}
 	/* This is an inner range, so the next node cannot be NULL. */
-	n = n.level[0].forward
+	// n = n.level[0].forward
 	if !max.greater(n.Score) {
 		return nil
 	}
