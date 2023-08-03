@@ -87,8 +87,6 @@ func MakeRouter() map[string]CmdFunc {
 	routerMap["zremrangebyscore"] = ZRemRangeByScore
 	routerMap["zremrangebyrank"] = ZRemRangeByRank
 
-	routerMap["zrevrangebyscore"] = ZRevRangeByScore
-
 	routerMap["flushdb"] = FlushDB
 	routerMap["flushall"] = FlushAll
 	routerMap["keys"] = Keys

@@ -58,7 +58,9 @@ func (h *Handler) Handle(ctx context.Context, conn net.Conn) {
 		if fixedLen == 0 {
 			msg, err = reader.ReadBytes('\n')
 			if err != nil {
-				if err == io.EOF || err == io.ErrUnexpectedEOF {
+				if err == io.EOF ||
+					err == io.ErrUnexpectedEOF ||
+					strings.Contains(err.Error(), "use of closed network connection") {
 					logger.Info("connection close")
 				} else {
 					logger.Warn(err)
@@ -76,7 +78,9 @@ func (h *Handler) Handle(ctx context.Context, conn net.Conn) {
 			msg = make([]byte, fixedLen+2)
 			_, err = io.ReadFull(reader, msg)
 			if err != nil {
-				if err == io.EOF || err == io.ErrUnexpectedEOF {
+				if err == io.EOF ||
+					err == io.ErrUnexpectedEOF ||
+					strings.Contains(err.Error(), "use of closed network connection") {
 					logger.Info("connection close")
 				} else {
 					logger.Warn(err)

@@ -8,6 +8,7 @@ import (
 	"my-godis/src/datastruct/lock"
 	"my-godis/src/interface/redis"
 	"my-godis/src/lib/logger"
+	"my-godis/src/pubsub"
 	"my-godis/src/redis/reply"
 	"os"
 	"runtime/debug"
@@ -45,12 +46,9 @@ type DB struct {
 	// TimerTask interval
 	interval time.Duration
 
-	// channel -> list(*Client)
-	subs dict.Dict
-	// lock channel
-	subsLocker *lock.Locks
-
 	stopWorld sync.WaitGroup
+
+	hub *pubsub.Hub
 
 	// main goroutine send commands to aof goroutine through aofChan
 	aofChan     chan *reply.MultiBulkReply
@@ -69,11 +67,10 @@ func MakeDB() *DB {
 		TTLMap:   dict.MakeConcurrent(ttlDictSize),
 		Locker:   lock.Make(lockerSize),
 		interval: 5 * time.Second,
-
-		subs:       dict.MakeConcurrent(4),
-		subsLocker: lock.Make(16),
+		hub:      pubsub.MakeHub(),
 	}
 
+	// aof
 	if config.Properties.AppendOnly {
 		db.aofFilename = config.Properties.AppendFilename
 		db.loadAof(0)
@@ -89,6 +86,7 @@ func MakeDB() *DB {
 		}()
 	}
 
+	// start timer
 	db.TimerTask()
 	return db
 }
@@ -102,7 +100,7 @@ func (db *DB) Close() {
 	}
 }
 
-func (db *DB) Exec(c redis.Client, args [][]byte) (result redis.Reply) {
+func (db *DB) Exec(c redis.Connection, args [][]byte) (result redis.Reply) {
 	defer func() {
 		if err := recover(); err != nil {
 			logger.Warn(fmt.Sprintf("error occurs: %v\n%s", err, string(debug.Stack())))
@@ -117,9 +115,11 @@ func (db *DB) Exec(c redis.Client, args [][]byte) (result redis.Reply) {
 		if len(args) < 2 {
 			return &reply.ArgNumErrReply{Cmd: "subscribe"}
 		}
-		return Subscribe(db, c, args[1:])
+		return pubsub.Subscribe(db.hub, c, args[1:])
+	} else if cmd == "publish" {
+		return pubsub.Publish(db.hub, args[1:])
 	} else if cmd == "unsubscribe" {
-		return UnSubscribe(db, c, args[1:])
+		return pubsub.UnSubscribe(db.hub, c, args[1:])
 	} else if cmd == "bgrewriteaof" {
 		// aof.go imports router.go, router.go cannot import BGRewriteAOF from aof.go
 		reply := BGRewriteAOF(db, args[1:])
@@ -292,6 +292,6 @@ func (db *DB) TimerTask() {
 
 /* ---- Subscribe Functions ---- */
 
-func (db *DB) AfterClientClose(c redis.Client) {
-	unsubscribeAll(db, c)
+func (db *DB) AfterClientClose(c redis.Connection) {
+	pubsub.UnsubscribeAll(db.hub, c)
 }

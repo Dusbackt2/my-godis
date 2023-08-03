@@ -7,8 +7,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"testing"
-	"time"
 )
 
 const (
@@ -121,20 +119,20 @@ func GoID() int {
 	return id
 }
 
-func debug(testing.T) {
-	lm := Locks{}
-	size := 10
-	var wg sync.WaitGroup
-	wg.Add(size)
-	for i := 0; i < size; i++ {
-		go func(i int) {
-			lm.Locks("1", "2")
-			println("go: " + strconv.Itoa(GoID()))
-			time.Sleep(time.Second)
-			println("go: " + strconv.Itoa(GoID()))
-			lm.UnLocks("1", "2")
-			wg.Done()
-		}(i)
-	}
-	wg.Wait()
-}
+// func debug(testing.T) {
+// 	lm := Locks{}
+// 	size := 10
+// 	var wg sync.WaitGroup
+// 	wg.Add(size)
+// 	for i := 0; i < size; i++ {
+// 		go func(i int) {
+// 			lm.Locks("1", "2")
+// 			println("go: " + strconv.Itoa(GoID()))
+// 			time.Sleep(time.Second)
+// 			println("go: " + strconv.Itoa(GoID()))
+// 			lm.UnLocks("1", "2")
+// 			wg.Done()
+// 		}(i)
+// 	}
+// 	wg.Wait()
+// }
