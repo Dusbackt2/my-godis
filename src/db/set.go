@@ -56,7 +56,7 @@ func SAdd(db *DB, args [][]byte) redis.Reply {
 	for _, member := range members {
 		counter += set.Add(string(member))
 	}
-	db.addAof(makeAofCmd("sadd", args))
+	db.AddAof(makeAofCmd("sadd", args))
 	return reply.MakeIntReply(int64(counter))
 }
 
@@ -110,7 +110,7 @@ func SRem(db *DB, args [][]byte) redis.Reply {
 		db.Remove(key)
 	}
 	if counter > 0 {
-		db.addAof(makeAofCmd("srem", args))
+		db.AddAof(makeAofCmd("srem", args))
 	}
 	return reply.MakeIntReply(int64(counter))
 }
@@ -251,7 +251,7 @@ func SInterStore(db *DB, args [][]byte) redis.Reply {
 	db.Put(dest, &DataEntity{
 		Data: set,
 	})
-	db.addAof(makeAofCmd("sinterstore", args))
+	db.AddAof(makeAofCmd("sinterstore", args))
 	return reply.MakeIntReply(int64(set.Len()))
 }
 
@@ -345,7 +345,7 @@ func SUnionStore(db *DB, args [][]byte) redis.Reply {
 		Data: set,
 	})
 
-	db.addAof(makeAofCmd("sunionstore", args))
+	db.AddAof(makeAofCmd("sunionstore", args))
 	return reply.MakeIntReply(int64(set.Len()))
 }
 
@@ -457,7 +457,7 @@ func SDiffStore(db *DB, args [][]byte) redis.Reply {
 		Data: set,
 	})
 
-	db.addAof(makeAofCmd("sdiffstore", args))
+	db.AddAof(makeAofCmd("sdiffstore", args))
 	return reply.MakeIntReply(int64(set.Len()))
 }
 
