@@ -74,7 +74,7 @@ func ZAdd(db *DB, args [][]byte) redis.Reply {
 		}
 	}
 
-	db.addAof(makeAofCmd("sdiffstore", args))
+	db.AddAof(makeAofCmd("sdiffstore", args))
 
 	return reply.MakeIntReply(int64(i))
 }
@@ -473,7 +473,7 @@ func ZRemRangeByScore(db *DB, args [][]byte) redis.Reply {
 
 	removed := sortedSet.RemoveByScore(min, max)
 	if removed > 0 {
-		db.addAof(makeAofCmd("zremrangebyscore", args))
+		db.AddAof(makeAofCmd("zremrangebyscore", args))
 	}
 	return reply.MakeIntReply(removed)
 }
@@ -529,7 +529,7 @@ func ZRemRangeByRank(db *DB, args [][]byte) redis.Reply {
 	// assert: start in [0, size - 1], stop in [start, size]
 	removed := sortedSet.RemoveByRank(start, stop)
 	if removed > 0 {
-		db.addAof(makeAofCmd("zremrangebyrank", args))
+		db.AddAof(makeAofCmd("zremrangebyrank", args))
 	}
 	return reply.MakeIntReply(removed)
 }
@@ -565,7 +565,7 @@ func ZRem(db *DB, args [][]byte) redis.Reply {
 		}
 	}
 	if deleted > 0 {
-		db.addAof(makeAofCmd("zrem", args))
+		db.AddAof(makeAofCmd("zrem", args))
 	}
 	return reply.MakeIntReply(deleted)
 }
@@ -594,13 +594,13 @@ func ZIncrBy(db *DB, args [][]byte) redis.Reply {
 	element, exists := sortedSet.Get(field)
 	if !exists {
 		sortedSet.Add(field, delta)
-		db.addAof(makeAofCmd("zincrby", args))
+		db.AddAof(makeAofCmd("zincrby", args))
 		return reply.MakeBulkReply(args[1])
 	} else {
 		score := element.Score + delta
 		sortedSet.Add(field, score)
 		bytes := []byte(strconv.FormatFloat(score, 'f', -1, 64))
-		db.addAof(makeAofCmd("zincrby", args))
+		db.AddAof(makeAofCmd("zincrby", args))
 		return reply.MakeBulkReply(bytes)
 	}
 }

@@ -11,9 +11,9 @@ func TestClient(t *testing.T) {
 		Path:       "logs",
 		Name:       "godis",
 		Ext:        ".log",
-		TimeFormat: "2006-01-02",
+		TimeFormat: "2023-08-07",
 	})
-	client, err := MakeClient("localhost:6379")
+	client, err := MakeClient("127.0.0.1:6379")
 	if err != nil {
 		t.Error(err)
 	}
@@ -55,7 +55,7 @@ func TestClient(t *testing.T) {
 	})
 	if intRet, ok := result.(*reply.IntReply); ok {
 		if intRet.Code != 1 {
-			t.Error("`del` failed, result: " + string(intRet.Code))
+			t.Error("`del` failed, result: " + string(rune(intRet.Code)))
 		}
 	}
 
@@ -81,7 +81,7 @@ func TestClient(t *testing.T) {
 	})
 	if intRet, ok := result.(*reply.IntReply); ok {
 		if intRet.Code != 3 {
-			t.Error("`rpush` failed, result: " + string(intRet.Code))
+			t.Error("`rpush` failed, result: " + string(rune(intRet.Code)))
 		}
 	}
 
